@@ -95,7 +95,7 @@ def export_csv(dict_info,nom_csv="default"):
 def concatener_les_infos(url_liste):
     tableau_scrapping = {}
     for url in url_liste:
-        scrap_page=scrapping_page_livre(url)
+        scrap_page = scrapping_page_livre(url)
         for key in scrap_page.keys():
             tableau_scrapping.setdefault(key, []).append(scrap_page[key])
     return tableau_scrapping
@@ -106,11 +106,10 @@ def category_scrapping(url_category_index):
     nb_pages = nombre_de_pages(url_category_index)
     urls_livres_list = []
     if nb_pages == 1:
-        urls_livres_list = [scrapping_urls_page(url_category_index[:-10]+"page-" + str(nb_pages) + ".html")]
+        urls_livres_list = scrapping_urls_page(url_category_index)
     else:
         for i in range(1, nb_pages+1):
             urls_livres_list.extend(scrapping_urls_page(url_category_index[:-10]+"page-" + str(i) + ".html"))
-    #export_csv(concatener_les_infos(urls_livres_list))
     return urls_livres_list
 
 
@@ -118,10 +117,13 @@ def category_scrapping(url_category_index):
 
 def booktoscrape_scrapping(url_booktoscrape):
     categories = scrapping_categories(url_booktoscrape)
+    nom_categories = list(categories.keys())
     url_categories = list(categories.values())
-    for k,v in categories.items():
-        books_url = category_scrapping(url_categories[2])
-        print(concatener_les_infos(books_url))
+    for i in range(len(nom_categories)):
+        books_url = category_scrapping(url_categories[i])
+        concatener_books_categorie = concatener_les_infos(books_url)
+        export_csv(concatener_books_categorie, nom_categories[i])
+        print(concatener_books_categorie)
     return books_url
 
 
