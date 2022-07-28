@@ -3,6 +3,7 @@ import numpy as np
 from math import*
 # Libraire Panda permet de créer un tableau facilement
 import pandas as pd
+import os
 from bs4 import BeautifulSoup
 
 # ---------------  Fontcion pour la création de l'objet soup à partir d'un URL  ---------------
@@ -41,10 +42,11 @@ def scrapping_page_livre(url):
     rating = soup.find("div", class_="col-sm-6 product_main").find_all("p")[2]["class"][1]
 
     # Récupére l'URL de l'image
-    img_url = soup.find("img")['src']
+    img_url = "http://books.toscrape.com" + soup.find("img")['src'][5:]
 
     # Récupére la description
     description = soup.find("div", id="content_inner").find_all("p")[3].text
+    description = description.replace(";", ",") # Elimine les ";" dans certains paragrpahe qui font buggé la fonction export_csv()
 
     # Récupére la catégorie
     category = soup.find("ul", class_="breadcrumb").find_all("a")[2].text
@@ -88,7 +90,7 @@ def nombre_de_pages(url):
 def export_csv(dict_info,nom_csv="default"):
     dataset = pd.DataFrame.from_dict(dict_info)
     print(dataset)
-    dataset.to_csv(nom_csv+".csv")
+    dataset.to_csv("./" + nom_csv + "/" + nom_csv + ".csv")
 
 #----- Concatener les donnés de plusieurs pages url de catégories sur un DICT -------
 
@@ -112,6 +114,13 @@ def category_scrapping(url_category_index):
             urls_livres_list.extend(scrapping_urls_page(url_category_index[:-10]+"page-" + str(i) + ".html"))
     return urls_livres_list
 
+#------------- Telecharger la photo ------------------------
+
+def telecharger_photo(nom,url_photo,nom_categorie):
+    f = open("./" + nom_categorie + "/" + nom + '.jpg','wb')
+    response = requests.get(url_photo)
+    f.write(response.content)
+    f.close()
 
 #------------- FINAL BOSS : Récupérer toutes les informations de booktoscrape par catégorie sur des CSV différent -----
 
@@ -120,13 +129,21 @@ def booktoscrape_scrapping(url_booktoscrape):
     nom_categories = list(categories.keys())
     url_categories = list(categories.values())
     for i in range(len(nom_categories)):
+        if not os.path.exists(nom_categories[i]):
+            os.makedirs(nom_categories[i])
         books_url = category_scrapping(url_categories[i])
         concatener_books_categorie = concatener_les_infos(books_url)
+        for x in range(len(concatener_books_categorie['title'])):
+            telecharger_photo(nom_categories[i]+"_" + str(x), concatener_books_categorie['image_url'][x], nom_categories[i])
         export_csv(concatener_books_categorie, nom_categories[i])
         print(concatener_books_categorie)
-    return books_url
+
+
 
 
 url = "http://books.toscrape.com/index.html"
-print(booktoscrape_scrapping(url))
+booktoscrape_scrapping(url)
+
+
+
 
