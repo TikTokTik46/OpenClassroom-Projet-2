@@ -1,4 +1,5 @@
 import requests
+import time
 import numpy as np
 from math import*
 # Libraire Panda permet de créer un tableau facilement
@@ -6,7 +7,7 @@ import pandas as pd
 import os
 from bs4 import BeautifulSoup
 
-# ---------------  Fontcion pour la création de l'objet soup à partir d'un URL  ---------------
+# ---------------  Fonction pour la création de l'objet soup à partir d'un URL  ---------------
 
 def url_to_soup(url):
     page = requests.get(url)
@@ -90,7 +91,7 @@ def nombre_de_pages(url):
 def export_csv(dict_info,nom_csv="default"):
     dataset = pd.DataFrame.from_dict(dict_info)
     print(dataset)
-    dataset.to_csv("./" + nom_csv + "/" + nom_csv + ".csv")
+    dataset.to_csv("./" + nom_csv + "/" + nom_csv + ".csv", encoding="utf-16")
 
 #----- Concatener les donnés de plusieurs pages url de catégories sur un DICT -------
 
@@ -125,6 +126,7 @@ def telecharger_photo(nom,url_photo,nom_categorie):
 #------------- FINAL BOSS : Récupérer toutes les informations de booktoscrape par catégorie sur des CSV différent -----
 
 def booktoscrape_scrapping(url_booktoscrape):
+    t_start = time.time()
     categories = scrapping_categories(url_booktoscrape)
     nom_categories = list(categories.keys())
     url_categories = list(categories.values())
@@ -137,13 +139,89 @@ def booktoscrape_scrapping(url_booktoscrape):
             telecharger_photo(nom_categories[i]+"_" + str(x), concatener_books_categorie['image_url'][x], nom_categories[i])
         export_csv(concatener_books_categorie, nom_categories[i])
         print(concatener_books_categorie)
+        t = time.time()-t_start
+        print(t)
+#---- Fastway----
+
+def scrapping_urls_page_fast(url):
+    soup = url_to_soup(url)
+    urls = soup.find("section").find_all("h3")
+    url_books = []
+    for url_book in urls:
+         url_books.append("http://books.toscrape.com/catalogue/" + url_book.find("a")['href'][6:])
+    return url_books
+
+def category_scrapping_fast(url_category_index):
+    nb_pages = nombre_de_pages(url_category_index)
+    urls_livres_list = []
+    for i in range(1, nb_pages+1):
+        urls_livres_list.extend(scrapping_urls_page_fast(url_category_index[:-11]+"page-" + str(i) + ".html"))
+    return urls_livres_list
+
+# ------------- Scrapping de la page ----------
+
+def scrapping_page_livre_fast(url):
+    # Récupére la soupe correpondante au tableau
+    soup = url_to_soup(url)
+    tr_retour = soup.find_all("tr")
+
+    # Ajoute l'URL)
+    url_list = url
+
+    # Récupére et ajoute le titre du livre
+    title = soup.find("h1").text
+
+    # Recupération UPC
+    UPC = tr_retour[0].text[4:-2]
+
+    # Price (excel. tax)
+    Price_no_tax = tr_retour[2].text[19:-2]
+
+    # Price (incl. tax)
+    Price_with_tax = tr_retour[3].text[19:-2]
+
+    # Availability
+    availability = tr_retour[5].text[24:-12]
+
+    # Rating
+    rating = soup.find("div", class_="col-sm-6 product_main").find_all("p")[2]["class"][1]
+
+    # Récupére l'URL de l'image
+    img_url = "http://books.toscrape.com" + soup.find("img")['src'][5:]
+
+    # Récupére la description
+    try:
+        description = soup.find(text="Product Description").find_next("p").text
+    except AttributeError:
+        description = "None"
+
+    # Récupére la catégorie
+    category = soup.find("ul", class_="breadcrumb").find_all("a")[2].text
+
+    livre_scrap = [
+        url_list, UPC, title, Price_with_tax, Price_no_tax,
+        availability, description, category, rating, img_url
+    ]
+    return livre_scrap
+
+def scrapping_fast_way(url):
+    url_books = category_scrapping_fast(url)
+    columns = [
+        "product_page_url", "universal_ product_code (upc)", "title", "price_including_tax",
+        "price_excluding_tax" , "number_available", "product_description", "category", "review_rating",
+        "image_url"
+    ]
+    list_scrapping_books = []
+    for url_book in url_books:
+        list_scrapping_books.append(scrapping_page_livre_fast(url_book))
+    df = pd.DataFrame(list_scrapping_books, columns=columns)
+    df.to_csv("./test_de_la_mort.csv", encoding="utf-16")
+    print(df.head())
+    return list_scrapping_books
 
 
-
-
-url = "http://books.toscrape.com/index.html"
-booktoscrape_scrapping(url)
-
-
-
-
+url = "http://books.toscrape.com/catalogue/category/books_1/page-1.html"
+t_start = time.time()
+print(scrapping_fast_way(url))
+t_end = time.time()
+print(t_end - t_start)
