@@ -141,24 +141,41 @@ def booktoscrape_scrapping(url_booktoscrape):
         print(concatener_books_categorie)
         t = time.time()-t_start
         print(t)
-#---- Fastway----
+
+
+
+
+#-----------------------------------------------------
+#---------------------- Fastway-----------------------
+#-----------------------------------------------------
+#------------- Telecharger la photo ------------------------
+
+def telecharger_photo_fast(urls_photos,nom_categorie):
+    i = 1
+    for image_url in urls_photos:
+        f = open("./" + nom_categorie + "/" + nom_categorie + str(i) + '.jpg','wb')
+        response = requests.get(image_url)
+        f.write(response.content)
+        f.close()
+        i += 1
 
 def scrapping_urls_page_fast(url):
     soup = url_to_soup(url)
     urls = soup.find("section").find_all("h3")
     url_books = []
     for url_book in urls:
-         url_books.append("http://books.toscrape.com/catalogue/" + url_book.find("a")['href'][6:])
+         url_books.append("http://books.toscrape.com/catalogue/" + url_book.find("a")['href'][6:].replace("../",""))
     return url_books
 
 def category_scrapping_fast(url_category_index):
     nb_pages = nombre_de_pages(url_category_index)
     urls_livres_list = []
-    for i in range(1, nb_pages+1):
-        urls_livres_list.extend(scrapping_urls_page_fast(url_category_index[:-11]+"page-" + str(i) + ".html"))
+    if nb_pages == 1:
+        urls_livres_list = scrapping_urls_page(url_category_index)
+    else:
+        for i in range(1, nb_pages+1):
+            urls_livres_list.extend(scrapping_urls_page_fast(url_category_index[:-10]+"page-" + str(i) + ".html"))
     return urls_livres_list
-
-# ------------- Scrapping de la page ----------
 
 def scrapping_page_livre_fast(url):
     # Récupére la soupe correpondante au tableau
@@ -215,13 +232,19 @@ def scrapping_fast_way(url):
     for url_book in url_books:
         list_scrapping_books.append(scrapping_page_livre_fast(url_book))
     df = pd.DataFrame(list_scrapping_books, columns=columns)
-    df.to_csv("./test_de_la_mort.csv", encoding="utf-16")
-    print(df.head())
-    return list_scrapping_books
+    list_categories = df["category"].drop_duplicates().to_list()
+    for category in list_categories:
+        if not os.path.exists(category):
+            os.makedirs(category)
+        df_mask = df["category"] == category
+        category_df = df[df_mask]
+        category_df.to_csv("./" + category + "/" + category + ".csv", encoding="utf-16")
+        telecharger_photo_fast(category_df["image_url"].to_list(), category)
 
 
-url = "http://books.toscrape.com/catalogue/category/books_1/page-1.html"
+
+url = "http://books.toscrape.com/catalogue/category/books_1/index.html"
 t_start = time.time()
-print(scrapping_fast_way(url))
+scrapping_fast_way(url)
 t_end = time.time()
 print(t_end - t_start)
