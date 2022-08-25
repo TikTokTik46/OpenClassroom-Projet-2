@@ -1,9 +1,9 @@
 import requests
 import time
 from math import*
-# Libraire Panda permet de créer un tableau facilement
 import pandas as pd
 import os
+import concurrent.futures
 from bs4 import BeautifulSoup
 
 # ---------------  Fonction pour la création de l'objet soup à partir d'un URL  ---------------
@@ -21,16 +21,27 @@ def nombre_de_pages(url):
     nb_pages = ceil(nb_livres/20)
     return nb_pages
 
+#------------- Liste index / url image -----------
+
+def liste_index_url_image (df):
+    list_index = df.index.values.tolist()
+    list_url = df["image_url"].to_list()
+    liste_index_url = list(zip(list_index, list_url))
+    return liste_index_url
+
 # --------- Telechargement des images ------------------------
 
-def telecharger_photo(urls_photos, nom_categorie):
-    i = 1
-    for image_url in urls_photos:
-        f = open("./" + nom_categorie + "/" + nom_categorie + str(i) + '.jpg', 'wb')
-        response = requests.get(image_url)
-        f.write(response.content)
-        f.close()
-        i += 1
+def telecharger_des_photos(url_index_liste, nom_categorie):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(lambda x: telecharger_une_photo(nom_categorie, x), url_index_liste)
+
+# --------- Telechargement une image ------------------------
+
+def telecharger_une_photo (nom_categorie, url_index_liste):
+    f = open("./" + nom_categorie + "/" + nom_categorie + "_" + str(url_index_liste[0]) + '.jpg', 'wb')
+    response = requests.get(url_index_liste[1])
+    f.write(response.content)
+    f.close()
 
 # ----------- Récupération des URLs d'une page catégorie ------
 
@@ -103,6 +114,7 @@ def scrapping_page_livre(url):
 # ----------- Création des dossier par Catégories et des CSV à partir d'un DataFrame PANDAS --------
 
 def scrapping_booktoscrap(url):
+    t_0 = time.time()
     url_books = category_scrapping(url)
     columns = [
         "product_page_url", "universal_ product_code (upc)", "title", "price_including_tax",
@@ -110,17 +122,17 @@ def scrapping_booktoscrap(url):
         "image_url"
     ]
     list_scrapping_books = []
-    for url_book in url_books:
-        list_scrapping_books.append(scrapping_page_livre(url_book))
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(lambda x: list_scrapping_books.append(scrapping_page_livre(x)), url_books)
     df = pd.DataFrame(list_scrapping_books, columns=columns)
     list_categories = df["category"].drop_duplicates().to_list()
     for category in list_categories:
         if not os.path.exists(category):
             os.makedirs(category)
         df_mask = df["category"] == category
-        category_df = df[df_mask]
+        category_df = df[df_mask].reset_index(drop=True)
         category_df.to_csv("./" + category + "/" + category + ".csv", encoding="utf-16")
-        telecharger_photo(category_df["image_url"].to_list(), category)
+        telecharger_des_photos(liste_index_url_image(category_df), category)
 
 
 url = "http://books.toscrape.com/catalogue/category/books_1/index.html"
