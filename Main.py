@@ -114,7 +114,7 @@ def scrapping_page_livre(url):
 # ----------- Création des dossier par Catégories et des CSV à partir d'un DataFrame PANDAS --------
 
 def scrapping_booktoscrap(url):
-    t_0 = time.time()
+    t0 = time.time()
     url_books = category_scrapping(url)
     columns = [
         "product_page_url", "universal_ product_code (upc)", "title", "price_including_tax",
@@ -125,6 +125,8 @@ def scrapping_booktoscrap(url):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(lambda x: list_scrapping_books.append(scrapping_page_livre(x)), url_books)
     df = pd.DataFrame(list_scrapping_books, columns=columns)
+    t1 = time.time()
+    print("Temps scrapping : "+ str (t1-t0))
     list_categories = df["category"].drop_duplicates().to_list()
     for category in list_categories:
         if not os.path.exists(category):
@@ -133,10 +135,11 @@ def scrapping_booktoscrap(url):
         category_df = df[df_mask].reset_index(drop=True)
         category_df.to_csv("./" + category + "/" + category + ".csv", encoding="utf-16")
         telecharger_des_photos(liste_index_url_image(category_df), category)
+    print("Temps téléchargement des images : " + str(time.time()-t1))
 
 
 url = "http://books.toscrape.com/catalogue/category/books_1/index.html"
 t_start = time.time()
 scrapping_booktoscrap(url)
 t_end = time.time()
-print(t_end - t_start)
+print("Temps d'exécution du script : " + str(t_end - t_start))
